@@ -1,0 +1,138 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 150 17% 97%; /* Soft Off-White with Greenish Tone #F7F9F8 */
+    --foreground: 150 10% 10%; /* Darker, slightly desaturated green-gray for text */
+    --card: 150 17% 99%; /* Slightly lighter than background for card depth */
+    --card-foreground: 150 10% 10%;
+    --popover: 150 17% 99%;
+    --popover-foreground: 150 10% 10%;
+    --primary: 145 25% 47%; /* Deep Sage Green #5C946E */
+    --primary-foreground: 145 20% 97%; /* Light text on primary */
+    --secondary: 18 100% 75%; /* Lighter Peach Coral for secondary elements #FF9F7C (variant of #FF8A5B) */
+    --secondary-foreground: 18 90% 15%; /* Dark text on secondary */
+    --muted: 150 15% 90%; /* Muted greenish gray */
+    --muted-foreground: 150 10% 45%;
+    --accent: 18 100% 67%; /* Peach Coral Orange #FF8A5B */
+    --accent-foreground: 0 0% 100%; /* White text on accent */
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 145 15% 88%; /* Subtle border, derived from Sage Green but lighter */
+    --input: 145 15% 94%; /* Input fields background */
+    --ring: 145 25% 47%; /* Deep Sage Green for ring */
+    --chart-1: 145 25% 47%; /* Deep Sage Green */
+    --chart-2: 18 100% 67%; /* Peach Coral Orange */
+    --chart-3: 150 15% 60%; /* Muted Green */
+    --chart-4: 30 80% 65%; /* A complementary warm color */
+    --chart-5: 200 30% 55%; /* A complementary cool color */
+    --radius: 0.5rem;
+
+    /* Sidebar specific colors - can be adjusted if a prominent sidebar is used */
+    --sidebar-background: 150 17% 95%;
+    --sidebar-foreground: 150 10% 20%;
+    --sidebar-primary: 145 25% 42%;
+    --sidebar-primary-foreground: 145 20% 95%;
+    --sidebar-accent: 145 20% 88%;
+    --sidebar-accent-foreground: 145 25% 30%;
+    --sidebar-border: 145 15% 85%;
+    --sidebar-ring: 145 25% 47%;
+  }
+
+  .dark {
+    --background: 150 10% 10%;
+    --foreground: 150 15% 95%;
+    --card: 150 10% 12%;
+    --card-foreground: 150 15% 95%;
+    --popover: 150 10% 12%;
+    --popover-foreground: 150 15% 95%;
+    --primary: 145 25% 50%;
+    --primary-foreground: 145 20% 9%;
+    --secondary: 18 100% 60%;
+    --secondary-foreground: 18 90% 10%;
+    --muted: 150 10% 20%;
+    --muted-foreground: 150 10% 65%;
+    --accent: 18 100% 70%;
+    --accent-foreground: 0 0% 10%;
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 145 10% 25%;
+    --input: 145 10% 22%;
+    --ring: 145 25% 50%;
+    --chart-1: 145 25% 50%;
+    --chart-2: 18 100% 70%;
+    --chart-3: 150 15% 50%;
+    --chart-4: 30 80% 60%;
+    --chart-5: 200 30% 50%;
+
+    --sidebar-background: 150 10% 12%;
+    --sidebar-foreground: 150 15% 90%;
+    --sidebar-primary: 145 25% 55%;
+    --sidebar-primary-foreground: 145 20% 92%;
+    --sidebar-accent: 145 10% 25%;
+    --sidebar-accent-foreground: 145 20% 85%;
+    --sidebar-border: 145 10% 28%;
+    --sidebar-ring: 145 25% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    height: 100%; /* Ensure html takes full height */
+    overflow-x: hidden; /* Prevent horizontal scroll globally */
+  }
+  body {
+    font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+    @apply bg-background text-foreground flex flex-col min-h-screen; /* Use flex-col and min-h-screen for sticky footer */
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* Global no-scrollbar utility */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+
+/* Glassmorphism helper class */
+.glassmorphic {
+  background: hsl(var(--card) / 0.6);
+  backdrop-filter: blur(10px) saturate(180%);
+  -webkit-backdrop-filter: blur(10px) saturate(180%);
+  border: 1px solid hsl(var(--border) / 0.3);
+}
+
+/* Parallax section (example, needs JS for true parallax) */
+.parallax-section {
+  background-attachment: fixed; /* Simple CSS parallax */
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+/* Floating food items animation for auth pages */
+@keyframes float {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+.food-item-float {
+  animation: float 6s ease-in-out infinite;
+}
