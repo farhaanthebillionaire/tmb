@@ -19,7 +19,7 @@ export function Navbar() {
               <Link href="/pricing">Pricing</Link>
             </Button>
             <Button variant="accent" asChild className="bg-accent text-accent-foreground hover:bg-accent/90">
-              <Link href="/login">Login /SignUp</Link>
+              <Link href="/login">Login / SignUp</Link>
             </Button>
           </nav>
         </div>
