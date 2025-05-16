@@ -3,6 +3,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { ArrowRight } from 'lucide-react';
+import heroBannerImage from '@/img/11.jpg'; // Import local image
 
 export function HeroSection() {
   return (
@@ -14,11 +15,11 @@ export function HeroSection() {
             <br /> One Bite at a Time.
           </h1>
           <p className="text-lg md:text-xl text-muted-foreground mb-10">
-            TrackMyBite uses AI to analyze your meals, understand your mood-food connection, and guide you towards a healthier, more mindful lifestyle.
+            Track My Bite uses AI to analyze your meals, understand your mood-food connection, and guide you towards a healthier, more mindful lifestyle.
           </p>
           <div className="flex justify-center gap-4">
             <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90" asChild>
-              <Link href="/dashboard">
+              <Link href="/register">
                 Start Tracking Now <ArrowRight className="ml-2 h-5 w-5" />
               </Link>
             </Button>
@@ -31,13 +32,12 @@ export function HeroSection() {
         </div>
         <div className="mt-16 md:mt-24 relative">
           <Image
-            src="https://picsum.photos/1200/600?random=1"
-            alt="TrackMyBite Dashboard Preview"
+            src={heroBannerImage} // Use imported local image
+            alt="Track My Bite Dashboard Preview"
             width={1200}
             height={600}
             className="rounded-xl shadow-2xl mx-auto object-cover"
-            data-ai-hint="fitness app"
-            priority
+            priority // Keep priority for LCP
           />
           <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent rounded-xl"></div>
         </div>
@@ -45,4 +45,3 @@ export function HeroSection() {
     </section>
   );
 }
-

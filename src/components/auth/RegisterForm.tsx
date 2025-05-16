@@ -68,7 +68,7 @@ export function RegisterForm() {
           <UtensilsCrossed className="h-12 w-12 text-primary" />
         </div>
         <CardTitle className="text-2xl font-bold">Create an Account</CardTitle>
-        <CardDescription>Join TrackMyBite and start your mindful eating journey.</CardDescription>
+        <CardDescription>Join Track My Bite and start your mindful eating journey.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>

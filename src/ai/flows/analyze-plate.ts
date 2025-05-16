@@ -85,8 +85,9 @@ const analyzePlateFlow = ai.defineFlow(
           console.error('[analyzePlateFlow] Error response data:', flowError.response.data);
       }
       console.error('************************************************************');
-      // Re-throw the error to be caught by the server action's try-catch block
-      throw flowError;
+      // Throw a new, simpler error object containing only the message.
+      // This helps ensure serializability if flowError itself is complex.
+      throw new Error(flowError.message || 'Genkit flow for plate analysis failed.');
     }
   }
 );

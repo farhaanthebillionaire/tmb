@@ -14,7 +14,7 @@ export function Footer() {
     )}>
       <div className="container flex flex-col sm:flex-row items-center justify-between gap-y-2 sm:gap-x-4">
         <p className="text-center sm:text-left order-1 sm:order-1 sm:ml-4">
-          &copy; {new Date().getFullYear()} TrackMyBite. All rights reserved.
+          &copy; {new Date().getFullYear()} Track My Bite. All rights reserved.
         </p>
         <p className="text-center order-2 sm:order-2">
           Created by{' '}

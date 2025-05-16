@@ -116,7 +116,7 @@ export default function RegisterPage() {
           <UtensilsCrossed className="h-12 w-12 text-primary" />
         </div>
         <CardTitle className="text-2xl font-bold">Create Your Account</CardTitle>
-        <CardDescription>Join TrackMyBite - Step 1 of 2.</CardDescription>
+        <CardDescription>Join Track My Bite - Step 1 of 2.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>

@@ -1,4 +1,3 @@
-
 // src/app/(auth)/login/page.tsx
 'use client';
 
@@ -7,7 +6,7 @@ import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -21,12 +20,12 @@ import {
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { UtensilsCrossed, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { UtensilsCrossed, Eye, EyeOff, Loader2, AlertTriangle } from 'lucide-react';
 import { useFoodLog } from '@/contexts/FoodLogContext';
-
-import { auth } from '@/lib/firebase/init'; // Import client-side auth
+import { auth } from '@/lib/firebase/init';
 import { signInWithEmailAndPassword, type UserCredential } from 'firebase/auth';
-import { handleUserSessionUpdate } from '@/lib/actions'; // Server action for Firestore profile
+import { handleUserSessionUpdate, type UserSessionUpdateResult } from '@/lib/actions'; // Import UserSessionUpdateResult
+import { Skeleton } from '@/components/ui/skeleton';
 
 const formSchema = z.object({
   email: z.string().email({ message: 'Invalid email address.' }),
@@ -39,27 +38,38 @@ export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const { fetchCurrentUserProfile, currentUser, isLoadingAuth, userProfile } = useFoodLog();
-  const [initialCheckDone, setInitialCheckDone] = useState(false);
+  const [isPageLoading, setIsPageLoading] = useState(true);
 
+  const checkAuthStateAndRedirects = useCallback(async () => {
+    if (isLoadingAuth) {
+      setIsPageLoading(true);
+      return;
+    }
+
+    if (currentUser) {
+      if (!userProfile) {
+        console.log("[LoginPage] Auth user exists, but userProfile context is null. Attempting to fetch profile...");
+        await fetchCurrentUserProfile(); 
+        setIsPageLoading(true); 
+        return;
+      }
+      console.log("[LoginPage] useEffect: User authenticated. Profile complete:", userProfile.isProfileComplete);
+      if (userProfile.isProfileComplete) {
+        router.replace('/dashboard');
+      } else {
+        router.replace('/complete-profile');
+      }
+      return; 
+    }
+    
+    setIsPageLoading(false);
+  }, [isLoadingAuth, currentUser, userProfile, router, fetchCurrentUserProfile]);
 
   useEffect(() => {
-    // This effect handles redirection for already logged-in users
-    // or users who land here with an incomplete profile.
-    if (!isLoadingAuth) {
-        if (currentUser && userProfile) { // User is logged in and profile is loaded
-            if (userProfile.isProfileComplete) {
-                router.replace('/dashboard');
-            } else {
-                router.replace('/complete-profile');
-            }
-        } else if (currentUser && !userProfile && !isLoadingAuth) {
-            // User is authenticated via Firebase, but profile not yet loaded in context
-            // This might happen if they refresh on complete-profile or are navigated from somewhere.
-            fetchCurrentUserProfile(); // Trigger a fetch, and the effect will re-evaluate.
-        }
-        setInitialCheckDone(true); // Mark initial check as done to prevent premature form render
+    if (!isSubmitting) {
+      checkAuthStateAndRedirects();
     }
-  }, [currentUser, isLoadingAuth, userProfile, router, fetchCurrentUserProfile]);
+  }, [isLoadingAuth, currentUser, userProfile, isSubmitting, checkAuthStateAndRedirects]);
 
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -72,55 +82,62 @@ export default function LoginPage() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
+    // Declare sessionUpdateResult here to make it accessible in the catch/finally if needed,
+    // though current logic only sets isSubmitting to false in catch.
+    let sessionUpdateResult: UserSessionUpdateResult | undefined = undefined; 
+
     try {
-      // Step 1: Client-side Firebase Authentication
       const userCredential: UserCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
       const user = userCredential.user;
+      console.log("[LoginPage] Client-side Firebase Auth successful for:", user.email);
 
-      // Step 2: Call server action to check/update Firestore profile status
-      // Pass isNewUser as false since this is a login
-      const sessionUpdateResult = await handleUserSessionUpdate({
+      sessionUpdateResult = await handleUserSessionUpdate({
         uid: user.uid,
         email: user.email,
-        name: user.displayName, 
+        name: user.displayName,
         isNewUser: false, 
       });
+      console.log("[LoginPage] Server action handleUserSessionUpdate result:", sessionUpdateResult);
 
       if (sessionUpdateResult.success) {
-        await fetchCurrentUserProfile(); // Ensure context is updated with latest profile
-        
         toast({
           title: 'Login Successful!',
-          description: `Welcome back, ${user.displayName || user.email}!`,
+          description: `Welcome back, ${sessionUpdateResult.name || sessionUpdateResult.email}!`,
         });
-
-        // Navigate based on profile completion status from server action
+        
+        // Perform navigation immediately based on server action result
         if (sessionUpdateResult.isProfileComplete) {
+          console.log("[LoginPage] onSubmit: Navigating to /dashboard");
           router.push('/dashboard');
         } else {
+          console.log("[LoginPage] onSubmit: Navigating to /complete-profile");
           router.push('/complete-profile');
         }
+        
+        // Update context in the background.
+        fetchCurrentUserProfile();
+
       } else {
-        // This case means Firestore profile interaction failed after successful Firebase Auth
         throw new Error(sessionUpdateResult.error || "Failed to update user session on server.");
       }
 
     } catch (error: any) {
       console.error('[LoginPage] Error during login process:', error);
       let errorMessage = 'Login Failed. Please check your credentials and try again.';
-      if (error.code) { // Firebase auth errors often have a code
+      if (error.code) { 
         switch (error.code) {
           case 'auth/user-not-found':
           case 'auth/wrong-password':
-          case 'auth/invalid-credential': // Generic credential error
+          case 'auth/invalid-credential': 
             errorMessage = 'Invalid email or password.';
             break;
           case 'auth/too-many-requests':
             errorMessage = 'Too many login attempts. Please try again later.';
             break;
-          // Add other specific Firebase error codes as needed
+          default:
+            errorMessage = error.message || errorMessage;
         }
-      } else if (error.message) { // For errors from handleUserSessionUpdate or other issues
+      } else if (error.message) { 
         errorMessage = error.message;
       }
       toast({
@@ -128,25 +145,27 @@ export default function LoginPage() {
         description: errorMessage,
         variant: 'destructive',
       });
-    } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(false); // Only set submitting to false on error
     }
   }
   
-  // Show loading screen until initial auth check is done
-  if (isLoadingAuth || !initialCheckDone) {
+  if (isPageLoading && !isSubmitting) { 
     return (
         <Card className="w-full max-w-md shadow-2xl glassmorphic">
             <CardHeader className="text-center">
-                <Loader2 className="h-12 w-12 text-primary mx-auto mb-4 animate-spin" />
-                <CardTitle className="text-2xl font-bold">Loading...</CardTitle>
-                <CardDescription>Checking your session.</CardDescription>
+                <Skeleton className="h-12 w-12 rounded-full mx-auto mb-4 bg-primary/20" />
+                <Skeleton className="h-7 w-3/4 mx-auto bg-muted" />
+                <Skeleton className="h-5 w-1/2 mx-auto mt-1 bg-muted" />
             </CardHeader>
-            <CardContent><div className="h-48"></div></CardContent>
+            <CardContent className="space-y-6">
+                <div><Skeleton className="h-4 w-1/4 mb-1 bg-muted" /><Skeleton className="h-10 w-full bg-muted" /></div>
+                <div><Skeleton className="h-4 w-1/4 mb-1 bg-muted" /><Skeleton className="h-10 w-full bg-muted" /></div>
+                <Skeleton className="h-10 w-full bg-primary/50" />
+                <div className="text-center"><Skeleton className="h-4 w-1/3 mx-auto bg-muted" /></div>
+            </CardContent>
         </Card>
     );
   }
-
 
   return (
     <Card className="w-full max-w-md shadow-2xl glassmorphic">
@@ -219,7 +238,7 @@ export default function LoginPage() {
         </Form>
         <p className="mt-6 text-center text-sm text-muted-foreground">
           Don&apos;t have an account?{' '}
-          <Link href="/register" className="font-medium text-primary hover:underline">
+          <Link href="/register" className="font-medium text-primary hover:underline" tabIndex={isSubmitting ? -1 : 0}>
             Sign up
           </Link>
         </p>

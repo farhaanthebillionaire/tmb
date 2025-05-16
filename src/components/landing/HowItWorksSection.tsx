@@ -1,43 +1,52 @@
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Lightbulb, LogIn, Camera, SmilePlus, BarChartHorizontalBig, Rocket } from 'lucide-react';
-import Image from 'next/image';
+import { LogIn, Camera, SmilePlus, BarChartHorizontalBig, Rocket } from 'lucide-react';
+import Image, { type StaticImageData } from 'next/image'; // Import StaticImageData
 
-const steps = [
+// Import local images
+import howItWorksSignupImage from '@/img/6.jpg';
+import howItWorksLogMealsImage from '@/img/9.jpg';
+import howItWorksTrackMoodImage from '@/img/4.jpg';
+import howItWorksDiscoverInsightsImage from '@/img/3.jpg';
+import howItWorksReachGoalsImage from '@/img/2.jpg';
+
+interface Step {
+  icon: JSX.Element;
+  title: string;
+  description: string;
+  imageSrc: StaticImageData; // Changed type from string to StaticImageData
+}
+
+const steps: Step[] = [
   {
     icon: <LogIn className="h-8 w-8 text-accent" />,
     title: '1. Sign Up in Seconds',
     description: 'Create your free account quickly and easily. No credit card required, ever!',
-    imageSrc: "https://picsum.photos/400/300?random=6",
-    imageHint: "registration form"
+    imageSrc: howItWorksSignupImage,
   },
   {
     icon: <Camera className="h-8 w-8 text-accent" />,
     title: '2. Log Your Meals Effortlessly',
     description: 'Snap a photo for AI analysis or simply type in your food items. Tracking has never been simpler.',
-    imageSrc: "https://picsum.photos/400/300?random=7",
-    imageHint: "meal logging"
+    imageSrc: howItWorksLogMealsImage,
   },
   {
     icon: <SmilePlus className="h-8 w-8 text-accent" />,
     title: '3. Track Your Mood',
     description: 'Log how you feel with our intuitive mood tracker. Understand the link between your diet and emotions.',
-    imageSrc: "https://picsum.photos/400/300?random=8",
-    imageHint: "mood tracking"
+    imageSrc: howItWorksTrackMoodImage,
   },
   {
     icon: <BarChartHorizontalBig className="h-8 w-8 text-accent" />,
     title: '4. Discover AI Insights',
     description: 'Let our AI analyze your logs to reveal patterns and provide personalized suggestions for a healthier you.',
-    imageSrc: "https://picsum.photos/400/300?random=9",
-    imageHint: "data analytics"
+    imageSrc: howItWorksDiscoverInsightsImage,
   },
    {
     icon: <Rocket className="h-8 w-8 text-accent" />,
     title: '5. Reach Your Wellness Goals',
     description: 'Utilize reports, forecasts, and insights to stay motivated and make informed decisions on your health journey.',
-    imageSrc: "https://picsum.photos/400/300?random=10",
-    imageHint: "goal achievement"
+    imageSrc: howItWorksReachGoalsImage,
   },
 ];
 
@@ -66,12 +75,11 @@ export function HowItWorksSection() {
               </CardHeader>
               <CardContent className="p-6 pt-0 flex-grow flex flex-col">
                 <Image 
-                    src={step.imageSrc}
+                    src={step.imageSrc} // Use imported local image
                     alt={step.title} 
                     width={400} 
                     height={200} 
                     className="w-full h-auto object-cover rounded-md mb-4 max-h-[200px]"
-                    data-ai-hint={step.imageHint}
                   />
                 <CardDescription className="text-muted-foreground">{step.description}</CardDescription>
               </CardContent>

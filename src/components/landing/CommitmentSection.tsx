@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Heart, ShieldCheck, Gift } from 'lucide-react';
 import Image from 'next/image';
+import commitmentImage from '@/img/13.jpg'; // Import local image
 
 export function CommitmentSection() {
   return (
@@ -13,7 +14,7 @@ export function CommitmentSection() {
             Our <span className="text-primary">Commitment</span> to You
           </h2>
           <p className="text-lg text-muted-foreground mt-4 max-w-2xl mx-auto">
-            We believe that everyone deserves access to tools that promote well-being. That&apos;s why TrackMyBite is, and always will be, completely free.
+            We believe that everyone deserves access to tools that promote well-being. That&apos;s why Track My Bite is, and always will be, completely free.
           </p>
         </div>
         <div className="grid md:grid-cols-2 gap-8 items-center">
@@ -54,19 +55,18 @@ export function CommitmentSection() {
              <div className="mt-8 text-center md:text-left">
                 <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90" asChild>
                     <Link href="/register">
-                    Join TrackMyBite Today!
+                    Join Track My Bite Today!
                     </Link>
                 </Button>
             </div>
           </div>
           <div className="hidden md:block">
             <Image
-              src="https://picsum.photos/500/500?random=11"
+              src={commitmentImage} // Use imported local image
               alt="Commitment to well-being"
               width={500}
               height={500}
               className="rounded-xl shadow-xl object-cover"
-              data-ai-hint="healthy lifestyle"
             />
           </div>
         </div>

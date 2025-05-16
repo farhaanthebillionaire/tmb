@@ -29,14 +29,14 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, UserCheck, AlertTriangle } from 'lucide-react';
-import { updateUserProfileDetailsAction } from '@/lib/actions';
+import { updateUserProfileDetailsAction, type UserProfileDetails } from '@/lib/actions'; // Import UserProfileDetails
 import { useFoodLog } from '@/contexts/FoodLogContext';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const formSchema = z.object({
   weight: z.string().min(1, "Weight is required.").regex(/^\d+(\.\d{1,2})?$/, "Must be a valid weight (e.g., 70 or 70.5)."),
   height: z.string().min(1, "Height is required.").regex(/^\d+$/, "Must be a valid height in cm (e.g., 175)."),
-  plan: z.string().min(1, "Please select a primary goal."),
+  plan: z.string().min(1, "Please select a primary goal."), // This will be cast to UserProfileDataPlan
   goal: z.string().min(5, "Goal details must be at least 5 characters.").max(200, "Goal details cannot exceed 200 characters.").optional().or(z.literal('')),
 });
 
@@ -70,17 +70,13 @@ export default function CompleteProfilePage() {
       return;
     }
 
-    // currentUser exists. If userProfile isn't loaded yet, fetch it.
     if (!userProfile) {
       console.log("[CompleteProfilePage] currentUser exists, but userProfile is null in context. Attempting to fetch...");
       await fetchCurrentUserProfile();
-      // After fetchCurrentUserProfile, this effect will re-run because userProfile in context will change.
-      // Keep isPageLoading true until the re-run with populated userProfile.
       setIsPageLoading(true); 
       return;
     }
     
-    // At this point, currentUser exists and userProfile is loaded from context
     if (userProfile.isProfileComplete) {
       console.log("[CompleteProfilePage] User profile IS complete. Redirecting to /dashboard.");
       toast({ title: "Profile Already Complete", description: "Redirecting to dashboard." });
@@ -88,9 +84,7 @@ export default function CompleteProfilePage() {
       return;
     }
 
-    // User exists, profile is loaded, and profile is NOT complete. Ready to show form.
     console.log("[CompleteProfilePage] Auth resolved, currentUser exists, profile incomplete. Rendering form.");
-    // Pre-fill form if some details exist but profile isn't complete (e.g., from partial previous attempt)
     form.reset({
         weight: userProfile.weight || '',
         height: userProfile.height || '',
@@ -103,7 +97,7 @@ export default function CompleteProfilePage() {
 
   useEffect(() => {
     checkAuthStateAndHandleRedirects();
-  }, [isLoadingAuth, currentUser, userProfile, checkAuthStateAndHandleRedirects]);
+  }, [checkAuthStateAndHandleRedirects]);
 
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
@@ -113,7 +107,14 @@ export default function CompleteProfilePage() {
       return;
     }
     setIsSubmitting(true);
-    const result = await updateUserProfileDetailsAction(currentUser.uid, values);
+
+    const profileDetailsToSend: UserProfileDetails = {
+      ...values,
+      name: currentUser.displayName || '', // Include the name from the authenticated user
+      plan: values.plan as UserProfileDetails['plan'], // Cast plan to the expected type
+    };
+
+    const result = await updateUserProfileDetailsAction(currentUser.uid, profileDetailsToSend);
 
     if (result.error) {
       toast({
@@ -125,9 +126,9 @@ export default function CompleteProfilePage() {
     } else {
       toast({
         title: 'Profile Complete!',
-        description: 'Your details have been saved. Welcome to TrackMyBite!',
+        description: 'Your details have been saved. Welcome to Track My Bite!',
       });
-      await fetchCurrentUserProfile(); // Refresh user profile in context
+      await fetchCurrentUserProfile(); 
       setIsSubmitting(false);
       router.push('/dashboard');
     }
@@ -154,8 +155,7 @@ export default function CompleteProfilePage() {
     );
   }
   
-  // Fallback if somehow isPageLoading is false but currentUser is gone (should be caught by useEffect)
-  if (!currentUser) {
+  if (!currentUser && !isLoadingAuth) { // Should be caught by useEffect, but defensive
      return (
         <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center">
             <AlertTriangle className="h-16 w-16 text-destructive mb-4" />

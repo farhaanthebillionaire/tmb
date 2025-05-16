@@ -1,34 +1,96 @@
+
 // src/components/dashboard/FoodLoggingCard.tsx
 'use client';
 
 import type { AnalyzePlateOutput } from '@/ai/flows/analyze-plate';
 import React, { useState, ChangeEvent, useEffect, useRef } from 'react';
 import Image from 'next/image';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Utensils, Camera, FileImage, PlusCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { Utensils, Camera as CameraIcon, FileImage, PlusCircle, AlertCircle, Loader2, Video, XCircle, ImageDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useFoodLog, type FullFoodLog } from '@/contexts/FoodLogContext';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface FoodLoggingCardProps {
-  addFoodLog: (log: Omit<FullFoodLog, 'id'>) => Promise<FullFoodLog | null>; // Updated prop type
+  addFoodLog: (log: Omit<FullFoodLog, 'id'>) => Promise<FullFoodLog | null>;
   handlePlateAnalysis: (photoDataUri: string) => Promise<AnalyzePlateOutput>;
 }
 
+const mealTypes = [
+  { value: "breakfast", label: "Breakfast" },
+  { value: "lunch", label: "Lunch" },
+  { value: "dinner", label: "Dinner" },
+  { value: "snack", label: "Snack" },
+  { value: "random", label: "Random/Other" },
+];
+
 export function FoodLoggingCard({ addFoodLog, handlePlateAnalysis }: FoodLoggingCardProps) {
+  const [activeTab, setActiveTab] = useState('text');
   const [textInput, setTextInput] = useState('');
   const [caloriesInput, setCaloriesInput] = useState('');
+  const [mealType, setMealType] = useState<string>(mealTypes[0].value); // Default to first meal type
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   
   const { toast } = useToast();
   const { currentUser, isLoadingAuth } = useFoodLog();
+
+  const [showLiveCamera, setShowLiveCamera] = useState(false);
+  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+
+  useEffect(() => {
+    let stream: MediaStream | null = null;
+    const getCameraPermission = async () => {
+      if (showLiveCamera) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          setHasCameraPermission(true);
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+          }
+        } catch (err) {
+          console.error('Error accessing camera:', err);
+          setHasCameraPermission(false);
+          toast({
+            variant: 'destructive',
+            title: 'Camera Access Denied',
+            description: 'Please enable camera permissions to use this feature.',
+          });
+          setShowLiveCamera(false); 
+        }
+      }
+    };
+
+    getCameraPermission();
+
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+      if (videoRef.current && videoRef.current.srcObject) {
+        const currentStream = videoRef.current.srcObject as MediaStream;
+        currentStream.getTracks().forEach(track => track.stop());
+        videoRef.current.srcObject = null;
+      }
+    };
+  }, [showLiveCamera, toast]);
 
   const handleImageUpload = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -39,6 +101,45 @@ export function FoodLoggingCard({ addFoodLog, handlePlateAnalysis }: FoodLogging
         setImagePreview(reader.result as string);
       };
       reader.readAsDataURL(file);
+      setShowLiveCamera(false); 
+    }
+  };
+
+  const openCamera = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    setShowLiveCamera(true);
+    setHasCameraPermission(null); 
+  };
+
+  const closeCamera = () => {
+    setShowLiveCamera(false);
+    if (videoRef.current && videoRef.current.srcObject) {
+        const stream = videoRef.current.srcObject as MediaStream;
+        stream.getTracks().forEach(track => track.stop());
+        videoRef.current.srcObject = null;
+    }
+  };
+
+  const handleCaptureImage = () => {
+    if (videoRef.current && canvasRef.current) {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const context = canvas.getContext('2d');
+      if (context) {
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const dataUri = canvas.toDataURL('image/jpeg');
+        setImagePreview(dataUri);
+        fetch(dataUri)
+          .then(res => res.blob())
+          .then(blob => {
+            const capturedFile = new File([blob], `capture-${Date.now()}.jpg`, { type: "image/jpeg" });
+            setImageFile(capturedFile);
+          });
+      }
+      closeCamera(); 
     }
   };
 
@@ -56,41 +157,46 @@ export function FoodLoggingCard({ addFoodLog, handlePlateAnalysis }: FoodLogging
       foodItems: textInput.split(',').map(item => item.trim()),
       calories: caloriesInput ? parseInt(caloriesInput, 10) : undefined,
       method: 'text',
+      mealType: mealType,
     };
     const loggedItem = await addFoodLog(newLogData);
     if (loggedItem) {
       setTextInput('');
       setCaloriesInput('');
-      toast({ title: "Food Logged!", description: `${loggedItem.foodItems.join(', ')} added.` });
+      toast({ title: "Food Logged!", description: `${loggedItem.foodItems.join(', ')} (${loggedItem.mealType}) added.` });
     } else {
       toast({ title: "Failed to Log", description: "Could not save your food log.", variant: "destructive" });
     }
   };
 
-  const logFoodByImage = async () => {
+  const logFoodByImageOrCamera = async () => {
     if (!currentUser) {
       toast({ title: "Not Logged In", description: "Please log in to analyze and add meals.", variant: "destructive" });
       return;
     }
     if (!imageFile || !imagePreview) {
-      toast({ title: "No Image", description: "Please upload an image of your meal.", variant: "destructive" });
+      toast({ title: "No Image", description: "Please upload an image or capture one with your camera.", variant: "destructive" });
       return;
     }
     setIsAnalyzing(true);
     try {
       const analysisResult = await handlePlateAnalysis(imagePreview);
+      const foodDescription = analysisResult.nutritionalContent.split('.')[0].trim() || 'Analyzed Meal';
+      
       const newLogData: Omit<FullFoodLog, 'id'> = {
         timestamp: new Date().toISOString(),
-        foodItems: [analysisResult.nutritionalContent.split('.')[0] || 'Analyzed Meal'], 
+        foodItems: [foodDescription], 
         calories: analysisResult.calorieEstimate,
-        method: 'image',
+        method: 'image', 
+        mealType: mealType,
         analysis: analysisResult,
       };
       const loggedItem = await addFoodLog(newLogData);
       if (loggedItem) {
         setImageFile(null);
         setImagePreview(null);
-        toast({ title: "Meal Analyzed & Logged!", description: `Estimated ${analysisResult.calorieEstimate} calories.` });
+        if(fileInputRef.current) fileInputRef.current.value = ""; 
+        toast({ title: "Meal Analyzed & Logged!", description: `${foodDescription} (${loggedItem.mealType}) - Estimated ${analysisResult.calorieEstimate} calories.` });
       } else {
         toast({ title: "Failed to Log", description: "Could not save your analyzed meal log.", variant: "destructive" });
       }
@@ -115,17 +221,32 @@ export function FoodLoggingCard({ addFoodLog, handlePlateAnalysis }: FoodLogging
             <PlusCircle className="mr-2 h-6 w-6" />
             Meal Entry
         </CardTitle>
-        <CardDescription>Add food items you've consumed using text or image.</CardDescription>
+        <CardDescription>Add food items, select meal type, and log using text, image upload, or your camera.</CardDescription>
       </CardHeader>
       <CardContent className="flex-grow flex flex-col">
-        <Tabs defaultValue="text" className="w-full flex flex-col flex-grow">
-          <TabsList className="grid w-full grid-cols-2 mb-2">
+        <div className="mb-4">
+          <Label htmlFor="meal-type">Meal Type</Label>
+          <Select value={mealType} onValueChange={setMealType} disabled={isSubmitDisabled}>
+            <SelectTrigger id="meal-type" className="w-full mt-1">
+              <SelectValue placeholder="Select meal type" />
+            </SelectTrigger>
+            <SelectContent>
+              {mealTypes.map(type => (
+                <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col flex-grow">
+          <TabsList className="grid w-full grid-cols-3 mb-4">
             <TabsTrigger value="text"><Utensils className="mr-1 h-4 w-4 sm:mr-2" />Text</TabsTrigger>
-            <TabsTrigger value="image"><Camera className="mr-1 h-4 w-4 sm:mr-2" />Image</TabsTrigger>
+            <TabsTrigger value="upload"><ImageDown className="mr-1 h-4 w-4 sm:mr-2" />Upload</TabsTrigger>
+            <TabsTrigger value="camera"><CameraIcon className="mr-1 h-4 w-4 sm:mr-2" />Camera</TabsTrigger>
           </TabsList>
           
-          <TabsContent value="text" className="space-y-2 flex-grow flex flex-col">
-            <div className="flex-grow space-y-2">
+          <TabsContent value="text" className="space-y-3 flex-grow flex flex-col">
+            <div className="flex-grow space-y-3">
               <div>
                 <Label htmlFor="food-text">Food Items (comma-separated)</Label>
                 <Textarea
@@ -133,7 +254,7 @@ export function FoodLoggingCard({ addFoodLog, handlePlateAnalysis }: FoodLogging
                   value={textInput}
                   onChange={(e) => setTextInput(e.target.value)}
                   placeholder="e.g., Apple, Banana, Chicken Salad"
-                  className="mt-1 min-h-[60px] resize-none"
+                  className="mt-1 min-h-[70px] resize-none"
                   disabled={isSubmitDisabled}
                 />
               </div>
@@ -155,41 +276,86 @@ export function FoodLoggingCard({ addFoodLog, handlePlateAnalysis }: FoodLogging
               className="w-full bg-primary text-primary-foreground hover:bg-primary/90 mt-auto"
               disabled={isSubmitDisabled || !textInput.trim()}
             >
-              {isLoadingAuth ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              {isLoadingAuth ? 'Loading...' : 'Log with Text'}
+              {isLoadingAuth && !currentUser ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {isLoadingAuth && !currentUser ? 'Loading...' : 'Log with Text'}
             </Button>
           </TabsContent>
 
-          <TabsContent value="image" className="space-y-2 flex-grow flex flex-col">
-            <div className="mt-1 flex flex-grow justify-center rounded-md border-2 border-dashed border-border px-4 py-3 hover:border-primary transition-colors min-h-[120px]">
-            <div className="space-y-1 text-center flex flex-col justify-center items-center">
-              {imagePreview ? (
-                <Image src={imagePreview} alt="Meal preview" width={150} height={75} className="mx-auto max-h-24 w-auto rounded-md object-contain" data-ai-hint="food meal" />
-              ) : (
-                <FileImage className="mx-auto h-10 w-10 text-muted-foreground" />
-              )}
-              <div className="flex text-sm text-muted-foreground">
-                <Label
-                  htmlFor="food-image-input"
-                  className={`relative cursor-pointer rounded-md bg-background font-medium text-primary hover:text-primary/80 focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 ${isSubmitDisabled || isAnalyzing ? 'cursor-not-allowed opacity-50' : ''}`}
-                >
-                  <span>Upload meal photo</span>
-                  <Input id="food-image-input" name="food-image-input" type="file" className="sr-only" accept="image/*" onChange={handleImageUpload} disabled={isAnalyzing || isSubmitDisabled} />
-                </Label>
+          <TabsContent value="upload" className="space-y-3 flex-grow flex flex-col justify-between">
+            <div className="mt-1 flex flex-col items-center justify-center rounded-md border-2 border-dashed border-border px-4 py-6 hover:border-primary transition-colors min-h-[150px] flex-grow">
+              <div className="space-y-1 text-center">
+                <FileImage className="mx-auto h-12 w-12 text-muted-foreground" />
+                <div className="flex text-sm text-muted-foreground">
+                  <Label
+                    htmlFor="food-image-input-upload"
+                    className={`relative cursor-pointer rounded-md bg-background font-medium text-primary hover:text-primary/80 focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 ${isSubmitDisabled || isAnalyzing ? 'cursor-not-allowed opacity-50' : ''}`}
+                  >
+                    <span>Upload meal photo</span>
+                    <Input id="food-image-input-upload" name="food-image-input-upload" type="file" className="sr-only" accept="image/*" onChange={handleImageUpload} disabled={isAnalyzing || isSubmitDisabled} ref={fileInputRef} />
+                  </Label>
+                </div>
+                <p className="text-xs text-muted-foreground">PNG, JPG, GIF up to 10MB</p>
               </div>
-              <p className="text-xs text-muted-foreground">PNG, JPG, GIF up to 10MB</p>
             </div>
-          </div>
-            <Button 
-              onClick={logFoodByImage} 
-              disabled={isSubmitDisabled || !imageFile || isAnalyzing} 
-              className="w-full bg-primary text-primary-foreground hover:bg-primary/90 mt-auto"
-            >
-              {isAnalyzing || isLoadingAuth ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              {isLoadingAuth ? 'Loading...' : (isAnalyzing ? 'Analyzing & Logging...' : 'Analyze & Log Image')}
-            </Button>
+          </TabsContent>
+
+          <TabsContent value="camera" className="space-y-3 flex-grow flex flex-col items-center justify-between">
+            <canvas ref={canvasRef} className="hidden" /> 
+            {!showLiveCamera && !imagePreview && (
+              <Button onClick={openCamera} variant="outline" className="w-full py-8 text-lg border-dashed border-2 hover:border-primary flex-grow flex items-center justify-center" disabled={isSubmitDisabled}>
+                <Video className="mr-2 h-6 w-6" /> Open Camera
+              </Button>
+            )}
+            {showLiveCamera && (
+              <div className="w-full space-y-2 flex flex-col items-center">
+                <video ref={videoRef} className="w-full aspect-video rounded-md bg-muted border" autoPlay muted playsInline />
+                {hasCameraPermission === false && (
+                  <Alert variant="destructive" className="w-full">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Camera Access Denied</AlertTitle>
+                    <AlertDescription>Please enable camera permissions to use this feature.</AlertDescription>
+                  </Alert>
+                )}
+                <div className="flex gap-2 mt-2 w-full">
+                  <Button onClick={handleCaptureImage} disabled={hasCameraPermission === false || isSubmitDisabled || isAnalyzing} className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90">
+                    <CameraIcon className="mr-2 h-4 w-4" /> Capture
+                  </Button>
+                  <Button variant="outline" onClick={closeCamera} className="flex-1">
+                     <XCircle className="mr-2 h-4 w-4" /> Close Camera
+                  </Button>
+                </div>
+              </div>
+            )}
           </TabsContent>
         </Tabs>
+
+        {imagePreview && (activeTab === 'upload' || activeTab === 'camera') && (
+          <div className="mt-4 p-2 border rounded-md bg-muted/30">
+            <Label className="text-sm font-medium text-primary">Image Preview:</Label>
+            <Image src={imagePreview} alt="Meal preview" width={200} height={150} className="mt-1 mx-auto max-h-40 w-auto rounded-md object-contain border" data-ai-hint="food meal" />
+             <Button 
+                variant="link" 
+                size="sm" 
+                className="text-destructive hover:text-destructive/80 w-full mt-1"
+                onClick={() => { setImagePreview(null); setImageFile(null); if(fileInputRef.current) fileInputRef.current.value = ""; }}
+                disabled={isAnalyzing}
+              >
+                Clear Image
+              </Button>
+          </div>
+        )}
+        
+        {(activeTab === 'upload' || activeTab === 'camera') && (
+            <Button 
+              onClick={logFoodByImageOrCamera} 
+              disabled={isSubmitDisabled || !imageFile || isAnalyzing} 
+              className="w-full bg-accent text-accent-foreground hover:bg-accent/90 mt-4"
+            >
+              {isAnalyzing || (isLoadingAuth && !currentUser) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {(isLoadingAuth && !currentUser) ? 'Loading...' : (isAnalyzing ? 'Analyzing...' : 'Analyze & Log Meal')}
+            </Button>
+        )}
+
         {isSubmitDisabled && !isLoadingAuth && (
             <Alert variant="default" className="mt-4 text-sm">
                 <AlertCircle className="h-4 w-4" />
@@ -203,4 +369,3 @@ export function FoodLoggingCard({ addFoodLog, handlePlateAnalysis }: FoodLogging
     </Card>
   );
 }
-
