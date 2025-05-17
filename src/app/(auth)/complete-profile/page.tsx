@@ -29,14 +29,14 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, UserCheck, AlertTriangle } from 'lucide-react';
-import { updateUserProfileDetailsAction, type UserProfileDetails } from '@/lib/actions'; // Import UserProfileDetails
+import { updateUserProfileDetailsAction, type UserProfileDetails } from '@/lib/actions'; 
 import { useFoodLog } from '@/contexts/FoodLogContext';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const formSchema = z.object({
   weight: z.string().min(1, "Weight is required.").regex(/^\d+(\.\d{1,2})?$/, "Must be a valid weight (e.g., 70 or 70.5)."),
   height: z.string().min(1, "Height is required.").regex(/^\d+$/, "Must be a valid height in cm (e.g., 175)."),
-  plan: z.string().min(1, "Please select a primary goal."), // This will be cast to UserProfileDataPlan
+  plan: z.string().min(1, "Please select a primary goal."), 
   goal: z.string().min(5, "Goal details must be at least 5 characters.").max(200, "Goal details cannot exceed 200 characters.").optional().or(z.literal('')),
 });
 
@@ -45,45 +45,49 @@ export default function CompleteProfilePage() {
   const { toast } = useToast();
   const { currentUser, isLoadingAuth, userProfile, fetchCurrentUserProfile } = useFoodLog();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isPageLoading, setIsPageLoading] = useState(true);
+  const [isPageLoading, setIsPageLoading] = useState(true); 
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      weight: '',
-      height: '',
-      plan: 'mindful_eating',
-      goal: '',
+      weight: userProfile?.weight || '',
+      height: userProfile?.height || '',
+      plan: userProfile?.plan || 'mindful_eating',
+      goal: userProfile?.goal || '',
     },
   });
-
+  
   const checkAuthStateAndHandleRedirects = useCallback(async () => {
-    console.log("[CompleteProfilePage] Checking auth state. isLoadingAuth:", isLoadingAuth);
-    if (isLoadingAuth) {
-      setIsPageLoading(true);
+    console.log("[CompleteProfilePage] checkAuthStateAndHandleRedirects called. isLoadingAuth:", isLoadingAuth, "isSubmitting:", isSubmitting);
+    if (isLoadingAuth || isSubmitting) {
+      setIsPageLoading(true); // Keep loading if auth is processing or form is submitting
       return;
     }
 
     if (!currentUser) {
-      console.log("[CompleteProfilePage] No currentUser. Redirecting to /login.");
+      console.log("[CompleteProfilePage] No currentUser after initial check. Redirecting to /login.");
       router.replace('/login');
       return;
     }
 
+    // currentUser exists, check profile status
     if (!userProfile) {
       console.log("[CompleteProfilePage] currentUser exists, but userProfile is null in context. Attempting to fetch...");
+      setIsPageLoading(true); // Show loading while profile is fetched
       await fetchCurrentUserProfile();
-      setIsPageLoading(true); 
-      return;
+      // After fetch, this effect will re-run, and userProfile should be populated.
+      // No need to set isPageLoading to false here, let the next run of effect handle it.
+      return; 
     }
     
+    // At this point, currentUser and userProfile are available (or fetch was attempted)
     if (userProfile.isProfileComplete) {
       console.log("[CompleteProfilePage] User profile IS complete. Redirecting to /dashboard.");
-      toast({ title: "Profile Already Complete", description: "Redirecting to dashboard." });
       router.replace('/dashboard');
       return;
     }
 
+    // If user is present, profile exists but is not complete, and not loading, render form
     console.log("[CompleteProfilePage] Auth resolved, currentUser exists, profile incomplete. Rendering form.");
     form.reset({
         weight: userProfile.weight || '',
@@ -91,9 +95,9 @@ export default function CompleteProfilePage() {
         plan: userProfile.plan || 'mindful_eating',
         goal: userProfile.goal || '',
     });
-    setIsPageLoading(false);
+    setIsPageLoading(false); // Ready to show the form
 
-  }, [isLoadingAuth, currentUser, userProfile, router, toast, fetchCurrentUserProfile, form]);
+  }, [isLoadingAuth, currentUser, userProfile, router, fetchCurrentUserProfile, form, isSubmitting]);
 
   useEffect(() => {
     checkAuthStateAndHandleRedirects();
@@ -109,9 +113,9 @@ export default function CompleteProfilePage() {
     setIsSubmitting(true);
 
     const profileDetailsToSend: UserProfileDetails = {
+      name: currentUser.displayName || '',
       ...values,
-      name: currentUser.displayName || '', // Include the name from the authenticated user
-      plan: values.plan as UserProfileDetails['plan'], // Cast plan to the expected type
+      plan: values.plan as UserProfileDetails['plan'], 
     };
 
     const result = await updateUserProfileDetailsAction(currentUser.uid, profileDetailsToSend);
@@ -126,11 +130,13 @@ export default function CompleteProfilePage() {
     } else {
       toast({
         title: 'Profile Complete!',
-        description: 'Your details have been saved. Welcome to Track My Bite!',
+        description: 'Your details have been saved. Welcome to TrackMyBite!',
       });
-      await fetchCurrentUserProfile(); 
-      setIsSubmitting(false);
+      // Prioritize navigation
       router.push('/dashboard');
+      // Update context in the background; the dashboard will benefit from the updated context.
+      fetchCurrentUserProfile(); 
+      setIsSubmitting(false); // Set submitting to false after navigation is initiated
     }
   }
 
@@ -138,24 +144,25 @@ export default function CompleteProfilePage() {
     return (
       <Card className="w-full max-w-lg shadow-2xl glassmorphic">
         <CardHeader className="text-center">
-          <Skeleton className="h-12 w-12 rounded-full mx-auto mb-4" />
-          <Skeleton className="h-7 w-3/4 mx-auto" />
-          <Skeleton className="h-5 w-1/2 mx-auto mt-1" />
+          <Skeleton className="h-12 w-12 rounded-full mx-auto mb-4 bg-primary/20" />
+          <Skeleton className="h-7 w-3/4 mx-auto bg-muted" />
+          <Skeleton className="h-5 w-1/2 mx-auto mt-1 bg-muted" />
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div><Skeleton className="h-4 w-1/4 mb-1" /><Skeleton className="h-10 w-full" /></div>
-            <div><Skeleton className="h-4 w-1/4 mb-1" /><Skeleton className="h-10 w-full" /></div>
+            <div><Skeleton className="h-4 w-1/4 mb-1 bg-muted" /><Skeleton className="h-10 w-full bg-muted" /></div>
+            <div><Skeleton className="h-4 w-1/4 mb-1 bg-muted" /><Skeleton className="h-10 w-full bg-muted" /></div>
           </div>
-          <div><Skeleton className="h-4 w-1/4 mb-1" /><Skeleton className="h-10 w-full" /></div>
-          <div><Skeleton className="h-4 w-1/4 mb-1" /><Skeleton className="h-20 w-full" /></div>
-          <Skeleton className="h-10 w-full" />
+          <div><Skeleton className="h-4 w-1/4 mb-1 bg-muted" /><Skeleton className="h-10 w-full bg-muted" /></div>
+          <div><Skeleton className="h-4 w-1/4 mb-1 bg-muted" /><Skeleton className="h-20 w-full bg-muted" /></div>
+          <Skeleton className="h-10 w-full bg-primary/50" />
         </CardContent>
       </Card>
     );
   }
   
-  if (!currentUser && !isLoadingAuth) { // Should be caught by useEffect, but defensive
+  // Defensive check, should be caught by useEffect guard.
+  if (!currentUser && !isLoadingAuth) { 
      return (
         <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center">
             <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
