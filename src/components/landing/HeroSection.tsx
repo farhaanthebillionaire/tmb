@@ -17,13 +17,23 @@ export function HeroSection() {
           <p className="text-lg md:text-xl text-muted-foreground mb-10">
             Track My Bite uses AI to analyze your meals, understand your mood-food connection, and guide you towards a healthier, more mindful lifestyle.
           </p>
-          <div className="flex justify-center gap-4">
-            <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90" asChild>
-              <Link href="/register">
+         {/* Responsive button container */}
+          <div className="flex flex-col sm:flex-row items-center sm:justify-center gap-4">
+            <Button
+              size="lg"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 w-full sm:w-auto"
+              asChild
+            >
+              <Link href="/dashboard">
                 Start Tracking Now <ArrowRight className="ml-2 h-5 w-5" />
               </Link>
             </Button>
-            <Button size="lg" variant="outline" className="border-primary text-primary hover:bg-primary/10" asChild>
+            <Button
+              size="lg"
+              variant="outline"
+              className="border-primary text-primary hover:bg-primary/10 w-full sm:w-auto"
+              asChild
+            >
               <Link href="/#features">
                 Learn More
               </Link>
