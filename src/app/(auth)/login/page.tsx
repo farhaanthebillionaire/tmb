@@ -24,7 +24,7 @@ import { UtensilsCrossed, Eye, EyeOff, Loader2, AlertTriangle } from 'lucide-rea
 import { useFoodLog } from '@/contexts/FoodLogContext';
 import { auth } from '@/lib/firebase/init';
 import { signInWithEmailAndPassword, type UserCredential } from 'firebase/auth';
-import { handleUserSessionUpdate, type UserSessionUpdateResult } from '@/lib/actions'; // Import UserSessionUpdateResult
+import { handleUserSessionUpdate, type UserSessionUpdateResult } from '@/lib/actions'; 
 import { Skeleton } from '@/components/ui/skeleton';
 
 const formSchema = z.object({
@@ -38,7 +38,7 @@ export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const { fetchCurrentUserProfile, currentUser, isLoadingAuth, userProfile } = useFoodLog();
-  const [isPageLoading, setIsPageLoading] = useState(true);
+  const [isPageLoading, setIsPageLoading] = useState(true); // Renamed from initialCheckDone for clarity
 
   const checkAuthStateAndRedirects = useCallback(async () => {
     if (isLoadingAuth) {
@@ -47,26 +47,31 @@ export default function LoginPage() {
     }
 
     if (currentUser) {
+      // If userProfile is not yet loaded but currentUser exists, try to fetch it.
+      // This is important if the user lands here directly while authenticated.
       if (!userProfile) {
         console.log("[LoginPage] Auth user exists, but userProfile context is null. Attempting to fetch profile...");
-        await fetchCurrentUserProfile(); 
-        setIsPageLoading(true); 
+        setIsPageLoading(true); // Keep loading while profile is fetched
+        await fetchCurrentUserProfile(); // This will trigger a re-render with updated context
+        // The effect will run again after fetchCurrentUserProfile updates context
         return;
       }
+
       console.log("[LoginPage] useEffect: User authenticated. Profile complete:", userProfile.isProfileComplete);
       if (userProfile.isProfileComplete) {
         router.replace('/dashboard');
       } else {
         router.replace('/complete-profile');
       }
-      return; 
+      return; // Important: return after navigation to prevent further execution
     }
     
+    // If no currentUser and auth is not loading, page is ready to be shown
     setIsPageLoading(false);
   }, [isLoadingAuth, currentUser, userProfile, router, fetchCurrentUserProfile]);
 
   useEffect(() => {
-    if (!isSubmitting) {
+    if (!isSubmitting) { // Only run this effect if not in the middle of a form submission
       checkAuthStateAndRedirects();
     }
   }, [isLoadingAuth, currentUser, userProfile, isSubmitting, checkAuthStateAndRedirects]);
@@ -82,8 +87,6 @@ export default function LoginPage() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
-    // Declare sessionUpdateResult here to make it accessible in the catch/finally if needed,
-    // though current logic only sets isSubmitting to false in catch.
     let sessionUpdateResult: UserSessionUpdateResult | undefined = undefined; 
 
     try {
@@ -105,7 +108,10 @@ export default function LoginPage() {
           description: `Welcome back, ${sessionUpdateResult.name || sessionUpdateResult.email}!`,
         });
         
-        // Perform navigation immediately based on server action result
+        // Update context BEFORE navigation to ensure next page has fresh data
+        await fetchCurrentUserProfile(); 
+        
+        // Navigate based on server action result
         if (sessionUpdateResult.isProfileComplete) {
           console.log("[LoginPage] onSubmit: Navigating to /dashboard");
           router.push('/dashboard');
@@ -113,10 +119,7 @@ export default function LoginPage() {
           console.log("[LoginPage] onSubmit: Navigating to /complete-profile");
           router.push('/complete-profile');
         }
-        
-        // Update context in the background.
-        fetchCurrentUserProfile();
-
+        // No need to setIsSubmitting(false) here as navigation will unmount
       } else {
         throw new Error(sessionUpdateResult.error || "Failed to update user session on server.");
       }
