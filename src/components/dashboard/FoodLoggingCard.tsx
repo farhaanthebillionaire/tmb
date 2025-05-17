@@ -1,4 +1,3 @@
-
 // src/components/dashboard/FoodLoggingCard.tsx
 'use client';
 
@@ -40,13 +39,13 @@ export function FoodLoggingCard({ addFoodLog, handlePlateAnalysis }: FoodLogging
   const [activeTab, setActiveTab] = useState('text');
   const [textInput, setTextInput] = useState('');
   const [caloriesInput, setCaloriesInput] = useState('');
-  const [mealType, setMealType] = useState<string>(mealTypes[0].value); // Default to first meal type
+  const [mealType, setMealType] = useState<string>(mealTypes[0].value);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   
   const { toast } = useToast();
-  const { currentUser, isLoadingAuth } = useFoodLog();
+  const { currentUser, isLoadingAuth } = useFoodLog(); // Use context to get auth state
 
   const [showLiveCamera, setShowLiveCamera] = useState(false);
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
@@ -57,28 +56,47 @@ export function FoodLoggingCard({ addFoodLog, handlePlateAnalysis }: FoodLogging
 
   useEffect(() => {
     let stream: MediaStream | null = null;
-    const getCameraPermission = async () => {
+    const getCameraStream = async () => {
       if (showLiveCamera) {
         try {
-          stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          // First, try to get the back camera
+          stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
           setHasCameraPermission(true);
           if (videoRef.current) {
             videoRef.current.srcObject = stream;
           }
-        } catch (err) {
-          console.error('Error accessing camera:', err);
-          setHasCameraPermission(false);
-          toast({
-            variant: 'destructive',
-            title: 'Camera Access Denied',
-            description: 'Please enable camera permissions to use this feature.',
-          });
-          setShowLiveCamera(false); 
+          console.log("Using environment (back) camera.");
+        } catch (errEnvironment) {
+          console.warn('Failed to get environment (back) camera, trying default:', errEnvironment);
+          // If back camera fails, try to get any camera (likely front)
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            setHasCameraPermission(true);
+            if (videoRef.current) {
+              videoRef.current.srcObject = stream;
+            }
+            console.log("Using default (front or other) camera.");
+          } catch (errDefault) {
+            console.error('Error accessing any camera:', errDefault);
+            setHasCameraPermission(false);
+            let description = 'Please enable camera permissions in your browser settings to use this app.';
+            if ((errEnvironment as Error).name === 'NotFoundError' || (errEnvironment as Error).name === 'DevicesNotFoundError') {
+                description = 'Could not find a suitable camera. Please ensure one is connected and enabled.';
+            } else if ((errEnvironment as Error).name === 'NotAllowedError' || (errEnvironment as Error).name === 'PermissionDeniedError') {
+                description = 'Camera access was denied. Please enable camera permissions in your browser settings.';
+            }
+            toast({
+              variant: 'destructive',
+              title: 'Camera Access Issue',
+              description: description,
+            });
+            setShowLiveCamera(false); 
+          }
         }
       }
     };
 
-    getCameraPermission();
+    getCameraStream();
 
     return () => {
       if (stream) {
@@ -163,7 +181,7 @@ export function FoodLoggingCard({ addFoodLog, handlePlateAnalysis }: FoodLogging
     if (loggedItem) {
       setTextInput('');
       setCaloriesInput('');
-      toast({ title: "Food Logged!", description: `${loggedItem.foodItems.join(', ')} (${loggedItem.mealType}) added.` });
+      toast({ title: "Food Logged!", description: `${loggedItem.foodItems.join(', ')} (${loggedItem.mealType || 'Meal'}) added.` });
     } else {
       toast({ title: "Failed to Log", description: "Could not save your food log.", variant: "destructive" });
     }
@@ -174,10 +192,15 @@ export function FoodLoggingCard({ addFoodLog, handlePlateAnalysis }: FoodLogging
       toast({ title: "Not Logged In", description: "Please log in to analyze and add meals.", variant: "destructive" });
       return;
     }
-    if (!imageFile || !imagePreview) {
+    if (!imageFile && !imagePreview) { // Check both: imageFile for uploads, imagePreview for captures
       toast({ title: "No Image", description: "Please upload an image or capture one with your camera.", variant: "destructive" });
       return;
     }
+    if (!imagePreview) { // Ensure imagePreview has data for analysis
+        toast({ title: "No Image Data", description: "Image data is missing for analysis.", variant: "destructive" });
+        return;
+    }
+
     setIsAnalyzing(true);
     try {
       const analysisResult = await handlePlateAnalysis(imagePreview);
@@ -196,14 +219,14 @@ export function FoodLoggingCard({ addFoodLog, handlePlateAnalysis }: FoodLogging
         setImageFile(null);
         setImagePreview(null);
         if(fileInputRef.current) fileInputRef.current.value = ""; 
-        toast({ title: "Meal Analyzed & Logged!", description: `${foodDescription} (${loggedItem.mealType}) - Estimated ${analysisResult.calorieEstimate} calories.` });
+        toast({ title: "Meal Analyzed & Logged!", description: `${foodDescription} (${loggedItem.mealType || 'Meal'}) - Estimated ${analysisResult.calorieEstimate} calories.` });
       } else {
         toast({ title: "Failed to Log", description: "Could not save your analyzed meal log.", variant: "destructive" });
       }
     } catch (error: any) {
       console.error("Error analyzing or logging image:", error);
       let errorMessage = "Could not analyze or log image. Please try again.";
-      if (error.message && error.message.includes("AI plate analysis failed")) {
+       if (error.message && (error.message.includes("AI plate analysis failed") || error.message.toLowerCase().includes("model not found"))) {
         errorMessage = error.message; 
       }
       toast({ title: "Operation Failed", description: errorMessage, variant: "destructive" });
@@ -276,8 +299,8 @@ export function FoodLoggingCard({ addFoodLog, handlePlateAnalysis }: FoodLogging
               className="w-full bg-primary text-primary-foreground hover:bg-primary/90 mt-auto"
               disabled={isSubmitDisabled || !textInput.trim()}
             >
-              {isLoadingAuth && !currentUser ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              {isLoadingAuth && !currentUser ? 'Loading...' : 'Log with Text'}
+              {isSubmitDisabled && !currentUser ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {isSubmitDisabled && !currentUser ? 'Loading...' : 'Log with Text'}
             </Button>
           </TabsContent>
 
@@ -309,15 +332,21 @@ export function FoodLoggingCard({ addFoodLog, handlePlateAnalysis }: FoodLogging
             {showLiveCamera && (
               <div className="w-full space-y-2 flex flex-col items-center">
                 <video ref={videoRef} className="w-full aspect-video rounded-md bg-muted border" autoPlay muted playsInline />
-                {hasCameraPermission === false && (
+                {hasCameraPermission === false && ( // Show this only if permission explicitly denied or no camera found
                   <Alert variant="destructive" className="w-full">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Camera Access Denied</AlertTitle>
-                    <AlertDescription>Please enable camera permissions to use this feature.</AlertDescription>
+                    <AlertTitle>Camera Access Issue</AlertTitle>
+                    <AlertDescription>Could not access camera. Please ensure it's enabled and permissions are granted.</AlertDescription>
                   </Alert>
                 )}
+                 {hasCameraPermission === null && ( // Show this while waiting for permission
+                  <div className="flex items-center text-muted-foreground">
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Requesting camera access...
+                  </div>
+                )}
                 <div className="flex gap-2 mt-2 w-full">
-                  <Button onClick={handleCaptureImage} disabled={hasCameraPermission === false || isSubmitDisabled || isAnalyzing} className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90">
+                  <Button onClick={handleCaptureImage} disabled={!hasCameraPermission || isSubmitDisabled || isAnalyzing} className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90">
                     <CameraIcon className="mr-2 h-4 w-4" /> Capture
                   </Button>
                   <Button variant="outline" onClick={closeCamera} className="flex-1">
@@ -348,11 +377,11 @@ export function FoodLoggingCard({ addFoodLog, handlePlateAnalysis }: FoodLogging
         {(activeTab === 'upload' || activeTab === 'camera') && (
             <Button 
               onClick={logFoodByImageOrCamera} 
-              disabled={isSubmitDisabled || !imageFile || isAnalyzing} 
+              disabled={isSubmitDisabled || (!imageFile && !imagePreview) || isAnalyzing} // check imagePreview as well for captured images
               className="w-full bg-accent text-accent-foreground hover:bg-accent/90 mt-4"
             >
-              {isAnalyzing || (isLoadingAuth && !currentUser) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              {(isLoadingAuth && !currentUser) ? 'Loading...' : (isAnalyzing ? 'Analyzing...' : 'Analyze & Log Meal')}
+              {isAnalyzing || (isSubmitDisabled && !currentUser) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {(isSubmitDisabled && !currentUser) ? 'Loading...' : (isAnalyzing ? 'Analyzing...' : 'Analyze & Log Meal')}
             </Button>
         )}
 
