@@ -24,7 +24,7 @@ export function HeroSection() {
               className="bg-primary text-primary-foreground hover:bg-primary/90 w-full sm:w-auto"
               asChild
             >
-              <Link href="/dashboard">
+              <Link href="/register">
                 Start Tracking Now <ArrowRight className="ml-2 h-5 w-5" />
               </Link>
             </Button>
